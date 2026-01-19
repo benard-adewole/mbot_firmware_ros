@@ -42,6 +42,7 @@ const float adc_conversion_factor = 3.0f / (1 << 12);
 
 // Global state variables
 mbot_state_t mbot_state = {0};
+static float pGyro_wz = 0;     
 mbot_cmd_t mbot_cmd = {0};
 mbot_params_t params;
 mbot_bhy_config_t mbot_imu_config;
@@ -49,6 +50,8 @@ mbot_bhy_data_t mbot_imu_data;
 static bool enable_pwm_lpf = true;
 rc_filter_t mbot_left_pwm_lpf;
 rc_filter_t mbot_right_pwm_lpf;
+rc_filter_t mbot_left_vel_lpf;
+rc_filter_t mbot_right_vel_lpf;
 
 // Global MicroROS objects
 static rcl_allocator_t allocator;
@@ -255,7 +258,7 @@ static bool mbot_loop(repeating_timer_t *rt) {
             &mbot_state.vy,
             &mbot_state.wz
         );
-        mbot_calculate_odometry(
+        /*mbot_calculate_odometry(
             mbot_state.vx,
             mbot_state.vy,
             mbot_state.wz,
@@ -263,7 +266,21 @@ static bool mbot_loop(repeating_timer_t *rt) {
             &mbot_state.odom_x,
             &mbot_state.odom_y,
             &mbot_state.odom_theta
+        );*/
+
+        mbot_update_odometry(
+            mbot_state.vx,
+            mbot_state.vy,
+            mbot_state.wz,
+            MAIN_LOOP_PERIOD,
+            &mbot_state.odom_x,
+            &mbot_state.odom_y,
+            &mbot_state.odom_theta,
+            mbot_state.imu_rpy[2] - pGyro_wz
         );
+
+        pGyro_wz = mbot_state.imu_rpy[2];
+
         /* Populate odometry and TF ROS messages with the exact timestamp of this calculation */
         int64_t stamp_ns = rmw_uros_epoch_nanos();
 
@@ -309,6 +326,15 @@ static bool mbot_loop(repeating_timer_t *rt) {
     bool cmd_fresh = (time_us_64() - local_cmd.timestamp_us) < MBOT_TIMEOUT_US;
     float pwm_left = 0.0f, pwm_right = 0.0f;
     float pid_pwm_left = 0.0f, pid_pwm_right = 0.0f;
+
+    // --- START OF INPUT FILTERING ---
+    // Clean the raw encoder velocity before giving it to the PID
+    float filtered_vel_l = rc_filter_march(&mbot_left_vel_lpf, local_state.wheel_vel[MOT_L]);
+    float filtered_vel_r = rc_filter_march(&mbot_right_vel_lpf, local_state.wheel_vel[MOT_R]);
+    // --- END OF INPUT FILTERING ---
+
+    
+
     if (cmd_fresh) {
         switch (local_cmd.drive_mode) {
             case MODE_MOTOR_PWM:{
@@ -327,7 +353,8 @@ static bool mbot_loop(repeating_timer_t *rt) {
                 float left_correction = 0.0f, right_correction = 0.0f;
                 mbot_motor_vel_controller(
                     local_cmd.wheel_vel[MOT_L], local_cmd.wheel_vel[MOT_R],
-                    local_state.wheel_vel[MOT_L], local_state.wheel_vel[MOT_R],
+                    //local_state.wheel_vel[MOT_L], local_state.wheel_vel[MOT_R],
+                    filtered_vel_l, filtered_vel_r,  // <--- Use filtered variables here
                     &left_correction, &right_correction
                 );
                 pid_pwm_left = left_correction * params.motor_polarity[MOT_L];
@@ -358,13 +385,18 @@ static bool mbot_loop(repeating_timer_t *rt) {
                 float ff_pwm_left = calibrated_pwm_from_vel_cmd(vel_left_comp, MOT_L);
                 float ff_pwm_right = calibrated_pwm_from_vel_cmd(vel_right_comp, MOT_R);
 
-                // PID PWM
+                // PID PWM - Pass the FILTERED values instead of local_state.wheel_vel
                 float left_correction = 0.0f, right_correction = 0.0f;
                 mbot_motor_vel_controller(
                     target_vel_left, target_vel_right,
-                    local_state.wheel_vel[MOT_L], local_state.wheel_vel[MOT_R],
+                    filtered_vel_l, filtered_vel_r,  // <--- Use filtered variables here
                     &left_correction, &right_correction
                 );
+                /*mbot_motor_vel_controller(
+                    target_vel_left, target_vel_right,
+                    local_state.wheel_vel[MOT_L], local_state.wheel_vel[MOT_R],
+                    &left_correction, &right_correction
+                );*/
                 
                 // Apply motor polarity to PID corrections
                 pid_pwm_left = params.motor_polarity[MOT_L] * left_correction;
@@ -498,7 +530,7 @@ int main() {
 
         if (time_us_64() - last_200ms_time > 200000) { // 200ms interval
             last_200ms_time = time_us_64();
-            mbot_print_state(&mbot_state);
+            mbot_print_state(&mbot_state, MAIN_LOOP_PERIOD);
         }
         sleep_us(500); 
     }
@@ -518,6 +550,9 @@ static int mbot_init_hardware(void){
     mbot_motor_init(MOT_L);
     mbot_motor_init(MOT_R);
     mbot_encoder_init();
+
+    mbot_left_vel_lpf = rc_filter_empty();
+    mbot_right_vel_lpf = rc_filter_empty();
 
     // Initialize the IMU 
     mbot_imu_config = mbot_imu_default_config();
@@ -540,6 +575,9 @@ static int mbot_init_hardware(void){
     mbot_right_pwm_lpf = rc_filter_empty();
     rc_filter_first_order_lowpass(&mbot_left_pwm_lpf, MAIN_LOOP_PERIOD, 0.20f);
     rc_filter_first_order_lowpass(&mbot_right_pwm_lpf, MAIN_LOOP_PERIOD, 0.20f);
+
+    rc_filter_first_order_lowpass(&mbot_left_vel_lpf, MAIN_LOOP_PERIOD, 0.10f);
+    rc_filter_first_order_lowpass(&mbot_right_vel_lpf, MAIN_LOOP_PERIOD, 0.10f);
 
     // Initialize FRAM
     mbot_init_fram();

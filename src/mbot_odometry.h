@@ -17,6 +17,7 @@ extern "C" {
  * @param theta Current orientation (will be updated)
  */
 void mbot_calculate_odometry(float vx, float vy, float wz, float dt, float* x, float* y, float* theta);
+void mbot_update_odometry(float vx, float vy, float wz, float dt, float* x, float* y, float* theta, float gyro_wz_diff);
 
 #ifdef __cplusplus
 }
