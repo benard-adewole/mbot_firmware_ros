@@ -55,18 +55,18 @@ class WheelPIDTester(Node):
         elapsed = time.time() - self.start_time
         
         # Simple test sequence
-        if elapsed < 5.0:
+        if elapsed < 15.0:
             # Forward
             cmd_left, cmd_right = 2, -2
             self.get_logger().info(f'Forward: cmd=[{cmd_left:.1f}, {cmd_right:.1f}], actual=[{self.current_wheel_vel[0]:.2f}, {self.current_wheel_vel[1]:.2f}]')
-        elif elapsed < 10.0:
+        #elif elapsed < 10.0:
             # Turn right
-            cmd_left, cmd_right = 2, 2
-            self.get_logger().info(f'Turn right: cmd=[{cmd_left:.1f}, {cmd_right:.1f}], actual=[{self.current_wheel_vel[0]:.2f}, {self.current_wheel_vel[1]:.2f}]')
-        elif elapsed < 15.0:
+            #cmd_left, cmd_right = 2, 2
+            #self.get_logger().info(f'Turn right: cmd=[{cmd_left:.1f}, {cmd_right:.1f}], actual=[{self.current_wheel_vel[0]:.2f}, {self.current_wheel_vel[1]:.2f}]')
+        #elif elapsed < 15.0:
             # Backward
-            cmd_left, cmd_right = -2, 2
-            self.get_logger().info(f'Backward: cmd=[{cmd_left:.1f}, {cmd_right:.1f}], actual=[{self.current_wheel_vel[0]:.2f}, {self.current_wheel_vel[1]:.2f}]')
+            #cmd_left, cmd_right = -2, 2
+            #self.get_logger().info(f'Backward: cmd=[{cmd_left:.1f}, {cmd_right:.1f}], actual=[{self.current_wheel_vel[0]:.2f}, {self.current_wheel_vel[1]:.2f}]')
         else:
             # Stop
             cmd_left, cmd_right = 0.0, 0.0
