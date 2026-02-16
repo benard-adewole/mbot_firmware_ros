@@ -58,13 +58,14 @@ void generateBottomLine(char* buf, int cols) {
     sprintf(buf, "|%s|\n", line);
 }
 
-void mbot_print_state(const mbot_state_t* state) {
+void mbot_print_state(const mbot_state_t* state,float dt) {
     printf("\033[2J\r");
     printf("| \033[32m MBot State \033[0m TIME: %lld |\n", state->timestamp_us);
 
     const char* analog_headings[] = {"AIN 0","AIN 1","AIN 2","BATT (V)"};
     const char* enc_headings[] = {"ENC L", "ENC R"};
     const char* imu_headings[] = {"ROLL", "PITCH", "YAW"};
+    const char* imu_gyro_headings[] = {"wx", "wy", "wz", "dt"};
     const char* motor_vel_headings[] = {"MOT L", "MOT R"};
     const char* odom_headings[] = {"X", "Y", "THETA"};
     char buf[1024] = {0};
@@ -84,6 +85,12 @@ void mbot_print_state(const mbot_state_t* state) {
     // IMU (RPY)
     float imu_array[1][3] = {{state->imu_rpy[0], state->imu_rpy[1], state->imu_rpy[2]}};
     generateTableFloat(buf, 1, 3, "IMU", imu_headings, imu_array);
+    printf("\r%s", buf);
+    buf[0] = '\0';
+
+    // IMU (RPY)
+    float imu_gyro_array[1][4] = {{state->imu_gyro[0], state->imu_gyro[1], state->imu_gyro[2], dt}};
+    generateTableFloat(buf, 1, 4, "IMU_Gyro", imu_gyro_headings, imu_gyro_array);
     printf("\r%s", buf);
     buf[0] = '\0';
 

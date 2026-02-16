@@ -11,7 +11,7 @@ void generateTableInt(char* buf, int rows, int cols, const char* title, const ch
 void generateTableFloat(char* buf, int rows, int cols, const char* title, const char* headings[], float data[rows][cols]);
 void generateBottomLine(char* buf, int cols);
 
-void mbot_print_state(const mbot_state_t* state);
+void mbot_print_state(const mbot_state_t* state, float dt);
 
 #ifdef __cplusplus
 }
